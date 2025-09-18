@@ -1,181 +1,270 @@
-from __future__ import print_function
-import os
+# search.py
+# ---------
+# Licensing Information:  You are free to use or extend these projects for
+# educational purposes provided that (1) you do not distribute or publish
+# solutions, (2) you retain this notice, and (3) you provide clear
+# attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
+# 
+# Attribution Information: The Pacman AI projects were developed at UC Berkeley.
+# The core projects and autograders were primarily created by John DeNero
+# (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
+# Student side autograding tools were added by Brad Miller, Nick Hay, and
+# Pieter Abbeel (pabbeel@cs.berkeley.edu).
+
+
+"""
+In search.py, you will implement generic search algorithms which are called by
+Pacman agents (in search_agents.py).
+"""
+
 import util
 
 class SearchProblem:
+    """
+    This class outlines the structure of a search problem, but doesn't implement
+    any of the methods (in object-oriented terms: an abstract class).
+
+    You do not need to change anything in this class, ever.
+    """
+
     def get_start_state(self):
-        raise NotImplementedError()
+        """
+        Returns the start state for the search problem.
+        """
+        util.raise_not_defined()
 
     def is_goal_state(self, state):
-        raise NotImplementedError()
+        """
+          state: Search state
+
+        Returns True if and only if the state is a valid goal state.
+        """
+        util.raise_not_defined()
 
     def get_successors(self, state):
-        raise NotImplementedError()
+        """
+          state: Search state
+
+        For a given state, this should return a list of triples, (successor,
+        action, step_cost), where 'successor' is a successor to the current
+        state, 'action' is the action required to get there, and 'step_cost' is
+        the incremental cost of expanding to that successor.
+        """
+        util.raise_not_defined()
 
     def get_cost_of_actions(self, actions):
-        raise NotImplementedError()
+        """
+         actions: A list of actions to take
 
-def null_heuristic(state, problem=None):
-    return 0
+        This method returns the total cost of a particular sequence of actions.
+        The sequence must be composed of legal moves.
+        """
+        util.raise_not_defined()
 
-def manhattan_heuristic(position, problem=None):
-    if problem is not None and hasattr(problem, 'goal'):
-        xy1 = position
-        xy2 = problem.goal
-        return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
-    return 0
+
+def tiny_maze_search(problem):
+    """
+    Returns a sequence of moves that solves tiny_maze.  For any other maze, the
+    sequence of moves will be incorrect, so only use this for tiny_maze.
+    """
+    from game import Directions
+    s = Directions.SOUTH
+    w = Directions.WEST
+    return  [s, s, w, s, w, w, s, w]
 
 def depth_first_search(problem):
+    """
+    Search the deepest nodes in the search tree first.
+    """
     from util import Stack
-    stack = Stack()
+    fringe = Stack()
+    fringe.push((problem.get_start_state(), []))
     visited = set()
-    start_state = problem.get_start_state()
-    stack.push((start_state, []))
-    while not stack.is_empty():
-        state, path = stack.pop()
-        if problem.is_goal_state(state):
-            return path
-        if state not in visited:
-            visited.add(state)
-            for successor in problem.get_successors(state):
-                if successor.state not in visited:
-                    new_path = path + [successor.action]
-                    stack.push((successor.state, new_path))
+
+    while not fringe.is_empty():
+        node, actions = fringe.pop()
+        if problem.is_goal_state(node):
+            return actions
+        if node not in visited:
+            visited.add(node)
+            for successor, action, cost in problem.get_successors(node):
+                new_actions = actions + [action]
+                fringe.push((successor, new_actions))
     return []
 
 def breadth_first_search(problem):
+    """Search the shallowest nodes in the search tree first."""
     from util import Queue
-    queue = Queue()
-    start_state = problem.get_start_state()
-    queue.push((start_state, []))
-    visited = {start_state}
-    while not queue.is_empty():
-        state, path = queue.pop()
-        if problem.is_goal_state(state):
-            return path
-        for successor in problem.get_successors(state):
-            if successor.state not in visited:
-                visited.add(successor.state)
-                new_path = path + [successor.action]
-                queue.push((successor.state, new_path))
+    fringe = Queue()
+    fringe.push((problem.get_start_state(), []))
+    visited = set()
+    visited.add(problem.get_start_state())
+
+    while not fringe.is_empty():
+        node, actions = fringe.pop()
+        if problem.is_goal_state(node):
+            return actions
+        for successor, action, cost in problem.get_successors(node):
+            if successor not in visited:
+                visited.add(successor)
+                new_actions = actions + [action]
+                fringe.push((successor, new_actions))
     return []
 
 def uniform_cost_search(problem):
+    """Search the node of least total cost first."""
     from util import PriorityQueue
     fringe = PriorityQueue()
-    start_state = problem.get_start_state()
-    fringe.push((start_state, []), 0)
+    fringe.push((problem.get_start_state(), []), 0)
     visited = {}
+
     while not fringe.is_empty():
-        state, path = fringe.pop()
-        if problem.is_goal_state(state):
-            return path
-        cost = problem.get_cost_of_actions(path)
-        if state not in visited or cost < visited[state]:
-            visited[state] = cost
-            for successor in problem.get_successors(state):
-                new_path = path + [successor.action]
-                fringe.push((successor.state, new_path), problem.get_cost_of_actions(new_path))
+        node, actions = fringe.pop()
+        if problem.is_goal_state(node):
+            return actions
+        
+        cost = problem.get_cost_of_actions(actions)
+        if node not in visited or cost < visited[node]:
+            visited[node] = cost
+            for successor, action, step_cost in problem.get_successors(node):
+                new_actions = actions + [action]
+                new_cost = problem.get_cost_of_actions(new_actions)
+                fringe.push((successor, new_actions), new_cost)
     return []
 
+def null_heuristic(state, problem=None):
+    """
+    A heuristic function estimates the cost from the current state to the nearest
+    goal in the provided SearchProblem.  This heuristic is trivial.
+    """
+    return 0
+
 def a_star_search(problem, heuristic=null_heuristic):
+    """Search the node that has the lowest combined cost and heuristic first."""
     from util import PriorityQueue
     fringe = PriorityQueue()
     start_state = problem.get_start_state()
     fringe.push((start_state, []), heuristic(start_state, problem))
     visited = {}
+
     while not fringe.is_empty():
-        state, path = fringe.pop()
-        if problem.is_goal_state(state):
-            return path
-        cost_so_far = problem.get_cost_of_actions(path)
-        if state not in visited or cost_so_far < visited[state]:
-            visited[state] = cost_so_far
-            for successor in problem.get_successors(state):
-                new_path = path + [successor.action]
-                new_cost = problem.get_cost_of_actions(new_path) + heuristic(successor.state, problem)
-                fringe.push((successor.state, new_path), new_cost)
+        node, actions = fringe.pop()
+        
+        cost_so_far = problem.get_cost_of_actions(actions)
+        
+        state_to_check = node if not isinstance(node, tuple) else (node[0], tuple(node[1].as_list()))
+
+        if state_to_check in visited and visited[state_to_check] <= cost_so_far:
+            continue
+            
+        visited[state_to_check] = cost_so_far
+
+        if problem.is_goal_state(node):
+            return actions
+
+        for successor, action, step_cost in problem.get_successors(node):
+            new_actions = actions + [action]
+            g_cost = problem.get_cost_of_actions(new_actions)
+            h_cost = heuristic(successor, problem)
+            f_cost = g_cost + h_cost
+            fringe.push((successor, new_actions), f_cost)
+            
     return []
 
 def bidirectional_astar_search(problem, heuristic=null_heuristic):
-    from util import PriorityQueue, Queue
-    start = problem.get_start_state()
-    if problem.is_goal_state(start):
+    """
+    Bidirectional A* search. This implementation is best suited for problems
+    with a single, explicitly defined goal state.
+    """
+    from util import PriorityQueue
+
+    start_node = problem.get_start_state()
+
+    # Ensure the problem has a single, defined goal for this search to work
+    if not hasattr(problem, 'goal'):
+        print("Warning: Bidirectional search requires a single 'goal' attribute. Falling back to A*.")
+        return a_star_search(problem, heuristic)
+
+    goal_node = problem.goal
+        
+    if problem.is_goal_state(start_node):
         return []
-    goal = getattr(problem, 'goal', None)
-    if goal is None:
-        q = Queue()
-        q.push(start)
-        visited_goal_search = {start}
-        while not q.is_empty():
-            state = q.pop()
-            if problem.is_goal_state(state):
-                goal = state
-                break
-            for successor in problem.get_successors(state):
-                if successor.state not in visited_goal_search:
-                    visited_goal_search.add(successor.state)
-                    q.push(successor.state)
-        if goal is None:
-            return a_star_search(problem, heuristic)
-    forward_fringe = PriorityQueue()
-    backward_fringe = PriorityQueue()
-    forward_fringe.push((start, []), heuristic(start, problem))
-    backward_fringe.push((goal, []), heuristic(goal, problem))
-    forward_visited = {start: (0, [])}
-    backward_visited = {goal: (0, [])}
-    best_cost = float('inf')
+
+    # --- Forward Search Initialization ---
+    f_fringe = PriorityQueue()
+    f_fringe.push(start_node, heuristic(start_node, problem))
+    f_g_costs = {start_node: 0}
+    f_paths = {start_node: []}
+    f_closed = set()
+
+    # --- Backward Search Initialization ---
+    b_fringe = PriorityQueue()
+    # Backward heuristic estimates cost from a node to the start_node
+    b_heuristic = lambda state, prob: util.manhattan_distance(state, start_node)
+    b_fringe.push(goal_node, b_heuristic(goal_node, problem))
+    b_g_costs = {goal_node: 0}
+    b_paths = {goal_node: []}
+    b_closed = set()
+
+    # Best path found so far
+    mu = float('inf') 
     best_path = []
-    while not forward_fringe.is_empty() and not backward_fringe.is_empty():
-        if not forward_fringe.is_empty():
-            curr_state, path = forward_fringe.pop()
-            cost_so_far = problem.get_cost_of_actions(path)
-            if curr_state in backward_visited:
-                b_cost, b_path = backward_visited[curr_state]
-                total_cost = cost_so_far + b_cost
-                if total_cost < best_cost:
-                    best_cost = total_cost
-                    best_path = path + _reverse_path(b_path)
-            if curr_state not in forward_visited or cost_so_far < forward_visited[curr_state][0]:
-                forward_visited[curr_state] = (cost_so_far, path)
-                for successor in problem.get_successors(curr_state):
-                    new_path = path + [successor.action]
-                    new_estimated = problem.get_cost_of_actions(new_path) + heuristic(successor.state, problem)
-                    forward_fringe.push((successor.state, new_path), new_estimated)
-        if not backward_fringe.is_empty():
-            curr_state, path = backward_fringe.pop()
-            cost_so_far = problem.get_cost_of_actions(path)
-            if curr_state in forward_visited:
-                f_cost, f_path = forward_visited[curr_state]
-                total_cost = cost_so_far + f_cost
-                if total_cost < best_cost:
-                    best_cost = total_cost
-                    best_path = f_path + _reverse_path(path)
-            if curr_state not in backward_visited or cost_so_far < backward_visited[curr_state][0]:
-                backward_visited[curr_state] = (cost_so_far, path)
-                for successor in problem.get_successors(curr_state):
-                    rev_action = _reverse_action(successor.action)
-                    new_path = path + [rev_action]
-                    total_estimated = problem.get_cost_of_actions(new_path) + heuristic(successor.state, problem)
-                    backward_fringe.push((successor.state, new_path), total_estimated)
+
+    def _reverse_path(path):
+        """Reverses a path and its actions."""
+        rev_path = []
+        reverse_map = {"North": "South", "South": "North", "East": "West", "West": "East", "Stop": "Stop"}
+        for action in reversed(path):
+            rev_path.append(reverse_map.get(action))
+        return rev_path
+
+    while not f_fringe.is_empty() and not b_fringe.is_empty():
+
+        # Check for intersection and update best path
+        for node in f_g_costs:
+            if node in b_g_costs:
+                new_cost = f_g_costs[node] + b_g_costs[node]
+                if new_cost < mu:
+                    mu = new_cost
+                    best_path = f_paths[node] + _reverse_path(b_paths[node])
+
+        # Termination condition
+        if f_fringe.peek()[1] + b_fringe.peek()[1] >= mu:
+            return best_path
+
+        # --- Expand Forward ---
+        if f_fringe.peek()[1] < b_fringe.peek()[1]:
+            u, _ = f_fringe.pop()
+            f_closed.add(u)
+            
+            for v, action, cost in problem.get_successors(u):
+                new_g = f_g_costs[u] + cost
+                if v not in f_g_costs or new_g < f_g_costs[v]:
+                    f_g_costs[v] = new_g
+                    f_paths[v] = f_paths[u] + [action]
+                    f_fringe.update(v, new_g + heuristic(v, problem))
+        
+        # --- Expand Backward ---
+        else:
+            u, _ = b_fringe.pop()
+            b_closed.add(u)
+
+            # Note: We need successors to the node `u` for backward search.
+            # This requires the problem to handle successor generation symmetrically.
+            for v, action, cost in problem.get_successors(u):
+                new_g = b_g_costs[u] + cost
+                if v not in b_g_costs or new_g < b_g_costs[v]:
+                    b_g_costs[v] = new_g
+                    b_paths[v] = b_paths[u] + [action]
+                    b_fringe.update(v, new_g + b_heuristic(v, problem))
+
     return best_path
 
-def _reverse_action(action):
-    reverse_map = {
-        "North": "South",
-        "South": "North",
-        "East": "West",
-        "West": "East",
-        "Stop": "Stop"
-    }
-    return reverse_map.get(action, action)
 
-def _reverse_path(path):
-    return [_reverse_action(a) for a in reversed(path)]
-
-
+# Abbreviations
 bfs = breadth_first_search
 dfs = depth_first_search
-ucs = uniform_cost_search
 astar = a_star_search
+ucs = uniform_cost_search
 bidirectional_astar = bidirectional_astar_search
+
