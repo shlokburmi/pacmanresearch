@@ -12,10 +12,13 @@
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
 
-from game import Game, GameState
 from util import manhattan_distance
 from game import Directions
 import random, util
+from game import Game
+from game import GameState
+
+
 
 class ClassicGameRules:
     """

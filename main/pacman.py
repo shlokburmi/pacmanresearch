@@ -37,6 +37,8 @@ os.chdir(SCRIPT_DIR)
 sys.path.insert(0, SCRIPT_DIR)
 # --- END ROBUST PATHING FIX ---
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
 
 from game import GameStateData
 from game import Game

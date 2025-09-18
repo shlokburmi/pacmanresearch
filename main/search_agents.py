@@ -14,12 +14,19 @@
 
 """
 This file contains all of the agents that can be selected to control Pacman.  To
-add an agent to the game, connect it to the PacmanGame class through the
-`pacman.py` file.  Note that this file is imported by `pacman.py` and is not a
-stand-alone script.
+select an agent, use the '-p' option when running pacman.py.  Arguments can be
+passed to your agent using '-a'.  For example, to load a SearchAgent that uses
+depth first search (dfs), run the following command:
+
+> python pacman.py -p SearchAgent -a fn=depth_first_search
+
+Commands deeply nested in folders might require slightly different commands to
+run.
 """
 
-from game import Directions, Agent, Actions
+from game import Directions
+from game import Agent
+from game import Actions
 import util
 import time
 import search
@@ -34,9 +41,22 @@ class GoWestAgent(Agent):
         else:
             return Directions.STOP
 
+def null_heuristic(state, problem=None):
+    """
+    A heuristic function that returns 0 for any state.
+    """
+    return 0
+
+def manhattan_heuristic(position, problem, info={}):
+    "The Manhattan distance heuristic for a PositionSearchProblem"
+    xy1 = position
+    xy2 = problem.goal
+    return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
+
+
 #######################################################
-# This portion is written for you, but will need to be #
-# changed trivially to solve the search problem.      #
+# This portion is written for you, but will be useful #
+# for your project.                                    #
 #######################################################
 
 class SearchAgent(Agent):
@@ -45,8 +65,8 @@ class SearchAgent(Agent):
     algorithm for a supplied search problem, then returns actions to follow that
     path.
 
-    As a default, this agent runs depth-first search on a
-    PositionSearchProblem to find location (1,1)
+    As a default, this agent runs depth first search on a PositionSearchProblem
+    to find location (1,1)
 
     Options for fn include:
       depth_first_search or dfs
@@ -56,7 +76,7 @@ class SearchAgent(Agent):
     Note: You should NOT change any code in SearchAgent
     """
 
-    def __init__(self, fn='depth_first_search', prob='PositionSearchProblem', heuristic='null_heuristic'):
+    def __init__(self, fn='depth_first_search', prob='PositionSearchProblem', heuristic='null_heuristic', **kwargs):
         # Warning: some advanced Python magic is employed below to find the right functions and problems
 
         # Get the search function from the name and heuristic
@@ -64,7 +84,6 @@ class SearchAgent(Agent):
             raise AttributeError(fn + ' is not a search function in search.py.')
         func = getattr(search, fn)
         if 'heuristic' not in func.__code__.co_varnames:
-            print(('[SearchAgent] using function ' + fn))
             self.search_function = func
         else:
             if heuristic in globals().keys():
@@ -73,15 +92,15 @@ class SearchAgent(Agent):
                 heur = getattr(search, heuristic)
             else:
                 raise AttributeError(heuristic + ' is not a function in search_agents.py or search.py.')
-            print(('[SearchAgent] using function %s and heuristic %s' % (fn, heuristic)))
-            # Store the search function (substituting lambda for create_function)
             self.search_function = lambda x: func(x, heuristic=heur)
 
         # Get the search problem type from the name
         if prob not in globals().keys() or not prob.endswith('Problem'):
-            raise AttributeError(prob + ' is not a search problem type in SearchAgents.py.')
+            raise AttributeError(prob + ' is not a search problem type in search_agents.py.')
         self.search_type = globals()[prob]
-        print(('[SearchAgent] using problem type ' + prob))
+        
+        # Store extra problem arguments
+        self.problem_args = kwargs
 
     def register_initial_state(self, state):
         """
@@ -93,12 +112,10 @@ class SearchAgent(Agent):
         state: a GameState object (pacman.py)
         """
         if self.search_function == None: raise Exception("No search function provided for SearchAgent")
-        starttime = time.time()
-        problem = self.search_type(state) # Makes a new search problem
+        
+        # Pass the extra arguments to the search problem constructor
+        problem = self.search_type(state, **self.problem_args) 
         self.actions  = self.search_function(problem) # Find a path
-        total_cost = problem.get_cost_of_actions(self.actions)
-        print(('Path found with total cost of %d in %.1f seconds' % (total_cost, time.time() - starttime)))
-        if '_expanded' in dir(problem): print(('Search nodes expanded: %d' % problem._expanded))
 
     def get_action(self, state):
         """
@@ -128,7 +145,13 @@ class PositionSearchProblem(search.SearchProblem):
     """
 
     def __init__(self, game_state, cost_fn = lambda x: 1, goal=(1,1), start=None, warn=True, visualize=True):
-        "Stores the start and goal. The start is stored in the observation."
+        """
+        Stores the start and goal.
+
+        game_state: A GameState object (pacman.py)
+        cost_fn: A function from a search state (position) to a non-negative number
+        goal: A position in the game_state
+        """
         self.walls = game_state.get_walls()
         self.start_state = game_state.get_pacman_position()
         if start != None: self.start_state = start
@@ -167,6 +190,10 @@ class PositionSearchProblem(search.SearchProblem):
         return successors
 
     def get_cost_of_actions(self, actions):
+        """
+        Returns the cost of a particular sequence of actions. If those actions
+        include an illegal move, return 999999.
+        """
         if actions == None: return 999999
         x,y= self.get_start_state()
         cost = 0
@@ -174,21 +201,25 @@ class PositionSearchProblem(search.SearchProblem):
             # Check figure out the next state and see whether its legal
             dx, dy = Actions.direction_to_vector(action)
             x, y = int(x + dx), int(y + dy)
-            if self.walls[x][y]:
-                return 999999
+            if self.walls[x][y]: return 999999
             cost += self.cost_fn((x,y))
         return cost
 
-class FoodSearchProblem(search.SearchProblem):
+class FoodSearchProblem:
     """
-    A search problem where the goal is to eat all of the food.
-    A state is represented as a tuple: (pacmanPosition, foodGrid)
+    A search problem associated with finding the a path that collects all of the
+    food (dots) in a Pacman game.
+
+    A search state in this problem is a tuple ( pacman_position, food_grid ) where
+      pacman_position: a tuple (x,y) of integers specifying Pacman's position
+      food_grid:       a Grid (see game.py) of booleans, where food_grid[x][y] is True if there is food at (x,y)
     """
     def __init__(self, starting_game_state):
         self.start = (starting_game_state.get_pacman_position(), starting_game_state.get_food())
         self.walls = starting_game_state.get_walls()
-        self._expanded = 0
-        self.heuristic_info = {}
+        self.starting_game_state = starting_game_state
+        self._expanded = 0 # DO NOT CHANGE
+        self.heuristic_info = {} # A dictionary for the heuristic to store information
 
     def get_start_state(self):
         return self.start
@@ -197,30 +228,45 @@ class FoodSearchProblem(search.SearchProblem):
         return state[1].count() == 0
 
     def get_successors(self, state):
+        "Returns successor states, the actions they require, and a cost of 1."
         successors = []
-        self._expanded += 1
-        pos, food_grid = state
-        x, y = pos
-
+        self._expanded += 1 # DO NOT CHANGE
         for direction in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            x,y = state[0]
             dx, dy = Actions.direction_to_vector(direction)
             nextx, nexty = int(x + dx), int(y + dy)
             if not self.walls[nextx][nexty]:
-                next_food = food_grid.copy()
+                next_food = state[1].copy()
                 next_food[nextx][nexty] = False
-                successors.append((((nextx, nexty), next_food), direction, 1))
+                successors.append( ( ((nextx, nexty), next_food), direction, 1) )
         return successors
 
     def get_cost_of_actions(self, actions):
-        x, y = self.get_start_state()[0]
+        """Returns the cost of a particular sequence of actions.  If those actions
+        include an illegal move, return 999999"""
+        x,y= self.get_start_state()[0]
         cost = 0
         for action in actions:
+            # figure out the next state and see whether it's legal
             dx, dy = Actions.direction_to_vector(action)
             x, y = int(x + dx), int(y + dy)
             if self.walls[x][y]:
                 return 999999
             cost += 1
         return cost
+
+def food_heuristic(state, problem):
+    position, food_grid = state
+    food_list = food_grid.as_list()
+    if not food_list:
+        return 0
+    # Find the Manhattan distance to the farthest food dot
+    max_dist = 0
+    for food in food_list:
+        dist = util.manhattan_distance(position, food)
+        if dist > max_dist:
+            max_dist = dist
+    return max_dist
 
 class FoodSearchAgent(SearchAgent):
     """
@@ -230,59 +276,34 @@ class FoodSearchAgent(SearchAgent):
         self.search_function = lambda prob: search.a_star_search(prob, food_heuristic)
         self.search_type = FoodSearchProblem
         
-def food_heuristic(state, problem):
-    """
-    Heuristic for the FoodSearchProblem. It calculates the Manhattan distance
-    from the current position to the farthest food dot.
-    """
-    position, food_grid = state
-    food_list = food_grid.as_list()
-    if not food_list:
-        return 0
-    
-    # A simple but effective heuristic is the distance to the farthest food dot.
-    # This is admissible because Pac-Man must travel at least that far.
-    max_dist = 0
-    for food_pos in food_list:
-        dist = util.manhattan_distance(position, food_pos)
-        if dist > max_dist:
-            max_dist = dist
-    return max_dist
-
-def manhattan_heuristic(position, problem, info={}):
-    "The Manhattan distance heuristic for a PositionSearchProblem"
-    xy1 = position
-    xy2 = problem.goal
-    return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
-
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
     def register_initial_state(self, state):
         self.actions = []
-        self.action_index = 0 # Reset action index
-        problem = self.search_type(state)
-        self.actions = self.search_function(problem)
-
-    def get_action(self, state):
-        if self.action_index >= len(self.actions):
-             # If out of actions, find the next closest dot and re-plan
-            food_grid = state.get_food()
-            if food_grid.count() == 0:
-                return Directions.STOP
-
-            pacman_pos = state.get_pacman_position()
+        current_state = state
+        while(current_state.get_food().count() > 0):
+            start_point = current_state.get_pacman_position()
+            food_grid = current_state.get_food()
             food_list = food_grid.as_list()
-            closest_dot = min(food_list, key=lambda food: util.manhattan_distance(pacman_pos, food))
-            
-            problem = PositionSearchProblem(state, start=pacman_pos, goal=closest_dot, warn=False, visualize=False)
-            
-            # Here you can use any search function. Let's use A* as a default.
-            self.actions = search.a_star_search(problem, heuristic=manhattan_heuristic)
-            self.action_index = 0
-            
-            if not self.actions:
-                 return Directions.STOP
+            closest_dot = min(food_list, key=lambda x: util.manhattan_distance(start_point, x))
+            prob = PositionSearchProblem(current_state, start=start_point, goal=closest_dot, warn=False, visualize=False)
+            path = self.search_function(prob)
+            self.actions += path
+            # Update the state to reflect the moves
+            for action in path:
+                legal = current_state.get_legal_actions()
+                if action not in legal:
+                    # This can happen if a ghost is in the way
+                    # In a real game, we'd need more complex logic
+                    # For this problem, we'll just stop planning
+                    return
+                current_state = current_state.generate_successor(0, action)
+        self.action_index = 0
 
-        action = self.actions[self.action_index]
-        self.action_index += 1
-        return action
+# This is the agent you were trying to create.
+# It uses bidirectional A* search on a PositionSearchProblem.
+class BidirectionalAgent(SearchAgent):
+    def __init__(self, **kwargs):
+        # We pass fn, prob, and heuristic directly to the SearchAgent constructor
+        super().__init__(fn='bidirectional_astar', prob='PositionSearchProblem', heuristic='manhattan_heuristic', **kwargs)
+
